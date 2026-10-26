@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>RYOIE BASEBALL - 投球勝負</title>
+<style>
+:root{--ink:#f7f7f7;--muted:#c9d5e1;--panel:rgba(8,20,34,.88);--line:rgba(255,255,255,.2);--gold:#ffd166;--blue:#65c8ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#081522;color:var(--ink);font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif}
+.app{max-width:760px;margin:auto;padding:10px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:3px 2px 9px}
+.logo{font-weight:900;letter-spacing:.07em;font-size:clamp(16px,4vw,22px)}.logo span{color:var(--gold)}
+.pill{border:1px solid #496176;border-radius:999px;padding:5px 9px;font-size:12px;color:#d8e8f5}
+.stadium{position:relative;overflow:hidden;border:1px solid #456177;border-radius:16px;background:#102b40;box-shadow:0 12px 35px #0007}
+canvas{display:block;width:100%;height:auto;touch-action:manipulation}
+.hud{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 5px;text-align:center;min-width:0}
+.stat .label{font-size:10px;color:#a9bfd0;letter-spacing:.08em}.stat .value{font-size:clamp(17px,4.5vw,24px);font-weight:850;line-height:1.35}
+.stat .value small{font-size:11px;color:#b9cddd}
+.panel{margin-top:9px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+.section-title{font-size:13px;color:#d4e4f1;font-weight:800;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px}
+.hint{font-size:12px;color:#a8bdcd;font-weight:500}
+.zone-wrap{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px;align-items:center}
+.zone{aspect-ratio:1.1/1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:3px;padding:5px;border:2px solid #d9edf8;border-radius:6px;background:linear-gradient(#143047,#0a1d2c)}
+.zone button{border:1px solid #8cb2c8;background:#ffffff0b;color:#eaf7ff;border-radius:4px;font-size:11px;min-width:0}
+.zone button.selected{background:#ffd166;color:#1c2832;border:2px solid white;font-weight:900;box-shadow:0 0 0 2px #ffd16655}
+.zone button:active,.btn:active{transform:scale(.98)}
+.readout{font-size:12px;color:#a9c1d2;line-height:1.7}
+.readout strong{color:white;font-size:17px}
+.buttons{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.btn{font:inherit;font-weight:800;border:1px solid #49667e;border-radius:9px;background:#152f44;color:#eef8ff;padding:11px 4px;min-height:44px;font-size:13px}
+.btn.selected{border:2px solid var(--gold);background:#594722;color:#fff4cb}
+.btn.primary{background:linear-gradient(135deg,#f5c75d,#f09b31);color:#1e2630;border:0;font-size:16px}
+.btn:disabled{opacity:.45}
+.action-row{display:grid;grid-template-columns:1.5fr 1fr;gap:8px;margin-top:9px}
+.message{margin-top:9px;padding:10px 12px;border-radius:10px;background:#102a3e;border:1px solid #35556d;min-height:43px;font-size:14px;font-weight:750;text-align:center}
+.message.good{color:#a5f3c1}.message.bad{color:#ffd166}.message.neutral{color:#eaf7ff}
+.foot{font-size:11px;color:#8ea6b9;text-align:center;margin:10px 0 4px}
+@media(max-width:390px){.app{padding:7px}.panel{padding:10px}.btn{font-size:12px;padding:10px 2px}.zone-wrap{gap:8px}.zone button{font-size:10px}}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="top"><div class="logo">⚾ RYOIE <span>BASEBALL</span></div><div class="pill">PITCHING MODE · 2D</div></div>
+ <div class="stadium"><canvas id="field" width="720" height="650" aria-label="投手の後ろから見た野球場"></canvas></div>
+ <div class="hud">
+  <div class="stat"><div class="label">球速</div><div class="value" id="speed">—<small> km/h</small></div></div>
+  <div class="stat"><div class="label">BALL</div><div class="value" id="balls">0</div></div>
+  <div class="stat"><div class="label">STRIKE</div><div class="value" id="strikes">0</div></div>
+  <div class="stat"><div class="label">OUT</div><div class="value" id="outs">0</div></div>
+ </div>
+ <div class="panel">
+  <div class="section-title"><span>① 投げるコースを選ぶ</span><span class="hint">ゾーンをタップ！</span></div>
+  <div class="zone-wrap">
+   <div class="zone" id="zone">
+    <button data-x="-1" data-y="-1">高め内</button><button data-x="0" data-y="-1">高め</button><button data-x="1" data-y="-1">高め外</button>
+    <button data-x="-1" data-y="0">内角</button><button data-x="0" data-y="0" class="selected">真ん中</button><button data-x="1" data-y="0">外角</button>
+    <button data-x="-1" data-y="1">低め内</button><button data-x="0" data-y="1">低め</button><button data-x="1" data-y="1">低め外</button>
+   </div>
+   <div class="readout">
+    <div>狙うコース</div><strong id="aimLabel">真ん中</strong><br>
+    球種を選んで「投げる」！<br>
+    <span style="color:#ffd166">黄色の点線＝ボールの軌道</span><br>
+    <span>※コースは狙い。毎回少しブレるぞ！</span>
+   </div>
+  </div>
+ </div>
+ <div class="panel">
+  <div class="section-title"><span>② 球種を選ぶ</span><span class="hint">球種で変化が変わる</span></div>
+  <div class="buttons" id="pitches">
+   <button class="btn selected" data-pitch="fast">ストレート</button>
+   <button class="btn" data-pitch="curve">カーブ</button>
+   <button class="btn" data-pitch="slider">スライダー</button>
+   <button class="btn" data-pitch="fork">フォーク</button>
+  </div>
+  <div class="action-row"><button class="btn primary" id="throwBtn">⚾ 投げる</button><button class="btn" id="resetBtn">打席リセット</button></div>
+  <div id="message" class="message neutral" role="status">コースと球種を選んで、投げてみよう！</div>
+ </div>
+ <div class="foot">スマホ対応 · タップ操作 · 何度でもプレイOK</div>
+</div>
+<script>
+(() => {
+const canvas=document.getElementById('field'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const state={aimX:0,aimY:0,pitch:'fast',balls:0,strikes:0,outs:0,pitches:0,anim:null,locked:false,lastResult:'',speed:0};
+const labels={'-1,-1':'高め内','0,-1':'高め','1,-1':'高め外','-1,0':'内角','0,0':'真ん中','1,0':'外角','-1,1':'低め内','0,1':'低め','1,1':'低め外'};
+const pitchInfo={fast:{name:'ストレート',speed:[100,118],curve:0,color:'#fff4cf'},curve:{name:'カーブ',speed:[75,94],curve:1,color:'#78dcff'},slider:{name:'スライダー',speed:[85,105],curve:2,color:'#c3a2ff'},fork:{name:'フォーク',speed:[88,108],curve:3,color:'#ffb27d'}};
+const rand=(a,b)=>Math.random()*(b-a)+a;
+function roundedRect(c,x,y,w,h,r){c.beginPath();c.roundRect(x,y,w,h,r);c.fill();}
+function drawField(){
+ const w=canvas.width,h=canvas.height;
+ let sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#173d59');sky.addColorStop(.43,'#356c82');sky.addColorStop(.44,'#1a563d');sky.addColorStop(1,'#09291f');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+ // night lights and distant stands
+ ctx.fillStyle='#112a3d';ctx.beginPath();ctx.moveTo(0,150);ctx.lineTo(105,115);ctx.lineTo(245,150);ctx.lineTo(360,120);ctx.lineTo(490,150);ctx.lineTo(620,112);ctx.lineTo(720,145);ctx.lineTo(720,280);ctx.lineTo(0,280);ctx.closePath();ctx.fill();
+ for(let row=0;row<5;row++){ctx.strokeStyle=row%2?'#31546a':'#243f54';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,160+row*20);ctx.lineTo(720,160+row*20);ctx.stroke();}
+ for(let i=0;i<150;i++){let x=(i*83)%720,y=143+(i*47)%112;ctx.fillStyle=['#c5d7e2','#f0b96a','#9bc6db','#6e91a7'][i%4];ctx.fillRect(x,y,2,3);}
+ // foul lines and grass
+ ctx.strokeStyle='#b6d9a0';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(360,565);ctx.lineTo(25,300);ctx.moveTo(360,565);ctx.lineTo(695,300);ctx.stroke();
+ ctx.fillStyle='#286443';ctx.beginPath();ctx.moveTo(360,565);ctx.lineTo(140,390);ctx.lineTo(360,265);ctx.lineTo(580,390);ctx.closePath();ctx.fill();
+ // outfield mowing stripes
+ for(let i=0;i<7;i++){ctx.fillStyle=i%2?'#2e7048':'#32784c';ctx.beginPath();ctx.moveTo(160+i*55,370);ctx.lineTo(190+i*45,310);ctx.lineTo(230+i*35,310);ctx.lineTo(220+i*40,370);ctx.closePath();ctx.fill();}
+ // infield dirt diamond
+ ctx.fillStyle='#b97849';ctx.beginPath();ctx.moveTo(360,530);ctx.lineTo(220,415);ctx.lineTo(360,320);ctx.lineTo(500,415);ctx.closePath();ctx.fill();
+ ctx.fillStyle='#c78a5b';ctx.beginPath();ctx.moveTo(360,510);ctx.lineTo(242,415);ctx.lineTo(360,337);ctx.lineTo(478,415);ctx.closePath();ctx.fill();
+ // mound
+ ctx.fillStyle='#d49b6c';ctx.beginPath();ctx.ellipse(360,402,48,22,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f4e6d3';ctx.fillRect(345,401,30,5);
+ // bases
+ function base(x,y,s){ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.fillStyle='#fff8e9';ctx.fillRect(-s/2,-s/2,s,s);ctx.restore()}
+ base(360,320,13);base(220,415,13);base(500,415,13);
+ // home plate
+ ctx.fillStyle='#fff9ee';ctx.beginPath();ctx.moveTo(344,548);ctx.lineTo(376,548);ctx.lineTo(376,563);ctx.lineTo(360,575);ctx.lineTo(344,563);ctx.closePath();ctx.fill();
+ // batter boxes
+ ctx.strokeStyle='#fff4d8';ctx.lineWidth=2;ctx.strokeRect(302,529,34,42);ctx.strokeRect(384,529,34,42);
+ // catcher behind home, body
+ drawPlayer(360,535,.8,'#173c72','#f0bd8a','catcher');
+ // batter
+ drawPlayer(407,526,.93,'#dfebf0','#bd825d','batter');
+ // bat
+ ctx.save();ctx.translate(419,502);ctx.rotate(-.58);ctx.fillStyle='#b47a3e';roundedRect(ctx,-4,-37,8,43,3);ctx.restore();
+ // pitcher foreground back-facing
+ drawPlayer(360,466,1.45,'#e7edf2','#d7a17d','pitcher');
+ // pitcher cap
+ ctx.fillStyle='#172b43';ctx.beginPath();ctx.ellipse(360,439,17,8,0,0,Math.PI*2);ctx.fill();
+ // pitch trail if anim
+ if(state.anim){drawTrajectory(state.anim);}
+ // selected aim marker on zone projected around plate
+ if(!state.anim){
+   const px=360+state.aimX*25,py=548+state.aimY*14;
+   ctx.strokeStyle='#ffd166';ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py,9,0,Math.PI*2);ctx.stroke();
+ }
+ // vignette / overlay
+ const vg=ctx.createRadialGradient(360,310,200,360,310,510);vg.addColorStop(0,'#0000');vg.addColorStop(1,'#020a12a8');ctx.fillStyle=vg;ctx.fillRect(0,0,w,h);
+ // title overlay
+ ctx.fillStyle='#071622cc';roundedRect(ctx,14,14,230,34,9);ctx.fillStyle='#e9f6ff';ctx.font='bold 14px system-ui';ctx.fillText('投手視点  /  PITCHING',25,36);
+ ctx.fillStyle='#ffffffcc';ctx.font='12px system-ui';ctx.fillText('FIELD VIEW',w-105,35);
+}
+function drawPlayer(x,y,s,jersey,skin,type){
+ ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+ // legs
+ ctx.strokeStyle='#101d29';ctx.lineWidth=8;ctx.lineCap='round';
+ ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(-10,17);ctx.moveTo(7,0);ctx.lineTo(10,17);ctx.stroke();
+ ctx.fillStyle='#111e2a';roundedRect(ctx,-18,13,15,7,3);roundedRect(ctx,4,13,15,7,3);
+ // body back
+ ctx.fillStyle=jersey;ctx.beginPath();ctx.moveTo(-15,-31);ctx.quadraticCurveTo(-21,-15,-13,2);ctx.lineTo(13,2);ctx.quadraticCurveTo(21,-15,15,-31);ctx.closePath();ctx.fill();
+ ctx.strokeStyle='#d8e0e8';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-28);ctx.lineTo(0,-3);ctx.stroke();
+ if(type==='pitcher'){ctx.fillStyle='#263c58';ctx.font='bold 13px system-ui';ctx.textAlign='center';ctx.fillText('10',0,-11);}
+ // arms
+ ctx.strokeStyle=skin;ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-13,-26);ctx.lineTo(-20,-12);ctx.moveTo(13,-26);ctx.lineTo(19,-14);ctx.stroke();
+ // head
+ ctx.fillStyle=skin;ctx.beginPath();ctx.ellipse(0,-39,10,12,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#192b40';ctx.beginPath();ctx.ellipse(0,-47,12,5,0,0,Math.PI*2);ctx.fill();ctx.fillRect(-11,-47,22,3);
+ if(type==='catcher'){ctx.strokeStyle='#c4d5e2';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-39,11,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#7a9aad';ctx.fillRect(-12,-42,24,8);}
+ ctx.restore();
+}
+function drawTrajectory(a){
+ const t=Math.min(1,a.t),start={x:360,y:462},end={x:360+a.ex,y:544+a.ey};
+ const bend=a.bend;
+ ctx.save();
+ // dashed planned arc
+ ctx.setLineDash([7,8]);ctx.strokeStyle=pitchInfo[a.pitch].color+'aa';ctx.lineWidth=3;ctx.beginPath();
+ for(let i=0;i<=40;i++){let q=i/40,x=start.x+(end.x-start.x)*q+bend*Math.sin(q*Math.PI),y=start.y+(end.y-start.y)*q+(a.drop||0)*q*q;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();ctx.setLineDash([]);
+ // ball on the path
+ const q=t,x=start.x+(end.x-start.x)*q+bend*Math.sin(q*Math.PI),y=start.y+(end.y-start.y)*q+(a.drop||0)*q*q;
+ const r=4+q*8;
+ ctx.shadowColor='#fff';ctx.shadowBlur=15;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+ ctx.strokeStyle='#c94e4e';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,r*.65,-1.1,.7);ctx.stroke();ctx.beginPath();ctx.arc(x,y,r*.65,2.05,3.85);ctx.stroke();
+ ctx.restore();
+}
+function render(){drawField();if(state.anim){state.anim.t+=.025;if(state.anim.t>=1){state.anim=null;resolvePitch();}else requestAnimationFrame(render);}}
+function showMessage(txt,cls='neutral'){$('message').textContent=txt;$('message').className='message '+cls;}
+function updateHUD(){$('balls').textContent=state.balls;$('strikes').textContent=state.strikes;$('outs').textContent=state.outs;$('speed').innerHTML=state.speed?state.speed+'<small> km/h</small>':'—<small> km/h</small>';}
+function resolvePitch(){
+ const p=state.pitch, info=pitchInfo[p];
+ const accuracy=Math.random();
+ const miss=accuracy<.16;
+ let x=state.aimX+rand(-.48,.48),y=state.aimY+rand(-.48,.48);
+ if(p==='curve')y+=.24;if(p==='fork')y+=.45;if(p==='slider')x+=state.aimX===0?(Math.random()<.5?-.45:.45):Math.sign(state.aimX)*.25;
+ if(miss){x+=rand(-.8,.8);y+=rand(-.65,.65);}
+ const inZone=Math.abs(x)<=1.05&&Math.abs(y)<=1.05;
+ const swing=Math.random()<.57;
+ const contactQuality=Math.random();
+ if(!inZone){
+   state.balls++;
+   showMessage('ボール！ 狙いから外れた。コースを調整しよう。','bad');
+ }else if(swing&&contactQuality<.45){
+   state.strikes++;
+   showMessage('空振り！ '+info.name+' が決まった！','good');
+ }else if(swing&&contactQuality<.67){
+   state.strikes=Math.min(2,state.strikes+1);
+   showMessage('ファウル！ カウント '+state.balls+' ボール '+state.strikes+' ストライク','neutral');
+ }else if(swing&&contactQuality>.92){
+   state.balls=0;state.strikes=0;
+   showMessage('痛烈な打球！ バッターに捉えられた！ 次の勝負だ。','bad');
+ }else{
+   state.strikes++;
+   showMessage('ストライク！ '+info.name+' がゾーンに入った！','good');
+ }
+ if(state.strikes>=3){state.outs++;state.balls=0;state.strikes=0;showMessage('三振！ ナイスピッチング！ 次の打者へ。','good');}
+ if(state.balls>=4){state.balls=0;state.strikes=0;showMessage('フォアボール。次の打者との勝負へ！','bad');}
+ if(state.outs>=3){state.outs=0;showMessage('チェンジ！ 3アウト。次のイニングへ！','good');}
+ updateHUD();$('throwBtn').disabled=false;state.locked=false;render();
+}
+function throwPitch(){
+ if(state.locked)return;state.locked=true;$('throwBtn').disabled=true;
+ const info=pitchInfo[state.pitch];state.speed=Math.round(rand(info.speed[0],info.speed[1]));updateHUD();
+ const spread=state.aimX*26,vertical=state.aimY*15;
+ let bend=state.pitch==='curve'?34:state.pitch==='slider'?(state.aimX<0?-25:25):state.pitch==='fork'?8:3;
+ let drop=state.pitch==='curve'?19:state.pitch==='fork'?29:state.pitch==='slider'?4:0;
+ state.anim={t:0,pitch:state.pitch,ex:spread+rand(-9,9),ey:vertical+rand(-7,7),bend,drop};
+ showMessage(pitchInfo[state.pitch].name+'！ ボールの軌道を見よう…','neutral');render();
+}
+$('zone').addEventListener('click',e=>{const b=e.target.closest('button[data-x]');if(!b||state.locked)return;state.aimX=+b.dataset.x;state.aimY=+b.dataset.y;document.querySelectorAll('#zone button').forEach(el=>el.classList.toggle('selected',el===b));$('aimLabel').textContent=labels[state.aimX+','+state.aimY];render();});
+$('pitches').addEventListener('click',e=>{const b=e.target.closest('button[data-pitch]');if(!b||state.locked)return;state.pitch=b.dataset.pitch;document.querySelectorAll('#pitches button').forEach(el=>el.classList.toggle('selected',el===b));});
+$('throwBtn').addEventListener('click',throwPitch);
+$('resetBtn').addEventListener('click',()=>{state.balls=0;state.strikes=0;state.outs=0;state.pitches=0;state.anim=null;state.locked=false;state.speed=0;updateHUD();$('throwBtn').disabled=false;showMessage('リセット完了！ コースと球種を選ぼう。');render();});
+updateHUD();render();
+})();
+</script>
+</body>
+</html>
